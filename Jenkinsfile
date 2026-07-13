@@ -1,29 +1,47 @@
-@Library('Shared')_
-pipeline{
-    agent { label 'dev-server'}
-    
-    stages{
-        stage("Code clone"){
-            steps{
-                sh "whoami"
-            clone("https://github.com/LondheShubham153/django-notes-app.git","main")
+pipeline {
+    agent any
+
+    environment {
+        REPO_URL    = "https://github.com/megh212/django-notes-app.git"
+        REPO_BRANCH = "main"
+        IMAGE_NAME  = "megh212/django-notes-app-django"
+        IMAGE_TAG   = "local"
+    }
+
+    stages {
+        stage('Pull') {
+            steps {
+                checkout([
+                    $class: 'GitSCM',
+                    branches: [[name: "*/${REPO_BRANCH}"]],
+                    userRemoteConfigs: [[url: REPO_URL]]
+                ])
             }
         }
-        stage("Code Build"){
-            steps{
-            dockerbuild("notes-app","latest")
+
+        stage('Build') {
+            steps {
+                sh 'docker build -t ${IMAGE_NAME}:${IMAGE_TAG} .'
             }
         }
-        stage("Push to DockerHub"){
-            steps{
-                dockerpush("dockerHubCreds","notes-app","latest")
+
+        stage('Test') {
+            steps {
+                sh 'docker run --rm ${IMAGE_NAME}:${IMAGE_TAG} python manage.py test'
             }
         }
-        stage("Deploy"){
-            steps{
-                deploy()
+
+        stage('Deploy') {
+            steps {
+                sh 'docker compose down || true'
+                sh 'docker compose up -d --build'
             }
         }
-        
+    }
+
+    post {
+        always {
+            sh 'docker image prune -f || true'
+        }
     }
 }
