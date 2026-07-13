@@ -25,15 +25,24 @@ pipeline {
             }
         }
 
+        stage('Start Services') {
+            steps {
+                sh '''
+                    docker compose down --remove-orphans || true
+                    docker compose up -d db django_app
+                '''
+            }
+        }
+
         stage('Test') {
             steps {
-                sh 'docker run --rm ${IMAGE_NAME}:${IMAGE_TAG} python manage.py test'
+                sh 'docker compose exec -T django_app python manage.py migrate --noinput'
+                sh 'docker compose exec -T django_app python manage.py test'
             }
         }
 
         stage('Deploy') {
             steps {
-                sh 'docker compose down || true'
                 sh 'docker compose up -d --build'
             }
         }
